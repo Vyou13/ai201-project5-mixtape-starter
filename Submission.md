@@ -1,34 +1,41 @@
 AI Usage Section
-Ai agent: gemini
-How AI was utilized: AI was used as a code navigation and architectural partner. I provided the AI with blocks of logic from the services/ folder to trace data flows, explain unknown Python standard library behaviors, and break down complex database queries.
+Ai agent: gemini and claude
+How AI was utilized: AI was used as a code navigation and architectural partner. I provided the AI with blocks of logic from the services/ folder to trace data flows, explain unknown Python standard library behaviors, and break down complex database queries. and for pushing to github
 
 What it helped clarify: It expedited the process of identifying why datetime.weekday() failed on Sundays compared to isoweekday(), and helped map out the many-to-many relationship table interactions in models.py.
 
 Where human verification took over: AI recommendations often missed the precise execution constraints of Flask-SQLAlchemy (such as explicit context requirements or missing commits). Every single bug identification was manually reproduced using explicit API test requests, and verified via the flask shell database query utility before any fix code was finalized.
 
 Codebase Map
+
 1. Application Architecture & File Responsibilities
-The Mixtape codebase is built using a strict modular architecture splitting routing, business logic, and data storage:
-app.py: The central application factory file. It initializes the Flask application context, handles database binding with SQLAlchemy, and registers blueprint routes.
+   The Mixtape codebase is built using a strict modular architecture splitting routing, business logic, and data storage:
+   app.py: The central application factory file. It initializes the Flask application context, handles database binding with SQLAlchemy, and registers blueprint routes.
 
-models.py: Contains the declarative database schemas. Defines five core models:
+models.py: Contains the declarative database schemas. Defines seven model classes plus three association tables:
 
-User: Stores credentials, profile info, and streak tracking properties.
+User: Stores profile info and streak-tracking properties (listening_streak, last_listened_at).
 
-Song: Holds track titles, artists, and original sharer references alongside user-submitted rating states.
+Tag: A label that can be attached to songs for search/discovery.
 
-Playlist: Defines playlist containers.
+Song: Holds track title, artist, and the original sharer reference (shared_by). Ratings are NOT stored on the Song — they live in a separate Rating model.
 
-PlaylistSong: A dedicated association table establishing a many-to-many relationship between playlists and songs, tracking an explicit order index.
+ListeningEvent: One row per play, recording user_id, song_id, and listened_at. This is what the streak and "Friends Listening Now" feed are computed from.
 
-Notification: Manages asynchronous social alert records for users.
+Rating: A dedicated model storing a user's 1–5 score for a song, with a unique constraint on (user_id, song_id). Relevant to Issue #4 — rating a song creates a Rating row but was missing the notification side effect.
+
+Playlist: A playlist container (name, created_by, is_collaborative). Its songs come through a many-to-many relationship via the playlist_entries table.
+
+Notification: Social alert records for users (e.g. "X added your song", "X rated your song").
+
+Association tables (db.Table, not model classes): friendships (user-to-user), song_tags (song-to-tag), and playlist_entries (playlist-to-song, carrying an explicit position column that gives songs an order within a playlist).
 
 routes/: Acts as the HTTP traffic controller layer (e.g., songs.py, playlists.py, users.py). These blueprints handle strictly raw request input payload parsing, URL parameters, and JSON response serializations, delegating all actual operations to the service layer.
 
 services/: The dedicated business logic layer of the platform (e.g., streak_service.py, feed_service.py, playlist_service.py). All state calculations, conditional criteria, data mutations, and transaction assertions live strictly here.
 
 2. Feature Data Flow Trace: Sharing a Song & Creating a Notification
-Client Interaction: A client issues a POST request to /songs/share.
+   Client Interaction: A client issues a POST request to /songs/share.
 
 Route Handling: routes/songs.py receives the payload, extracts the track data and user context, and executes song_service.share_song(user_id, data).
 
@@ -70,11 +77,4 @@ The fix and side-effect check: Removed the restrictive loop index boundary or sl
 Git Log Evidence
 
 $ git log --oneline
-699099a (HEAD -> bugfix/mixtape) fix: remove spurious weekday guard so streak increments on consecutive days regardless of weekday
-7a838c4 fix: remove distinct() from get_playlist_songs to preserve repeated song entries and order
-f816d14 fix: enforce distinct results on track search filters to eliminate structural duplicate rows
-251aacb fix: correct off-by-one boundary index calculation in playlist song collection
-0a848e2 fix: replace weekday tracking logic with standard ISO week day evaluation bounds
-205cf9e documentation: create submission file and draft codebase map
-2dfdeaa Add .gitignore file and update README with setup instructions
-7b64551 initial commit
+![alt text](image.png)
