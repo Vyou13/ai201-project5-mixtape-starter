@@ -60,7 +60,6 @@ def get_playlist_songs(playlist_id: str) -> list[dict]:
         .join(playlist_entries, Song.id == playlist_entries.c.song_id)
         .filter(playlist_entries.c.playlist_id == playlist_id)
         .order_by(asc(playlist_entries.c.position))
-        .distinct()
         .all()
     )
 
